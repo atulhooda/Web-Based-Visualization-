@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Web-Based Visualization of Road Networks using Google Map</title>
+
+<!-- Leaflet for interactive road-network graph -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- GeoGebra HTML5 applet (replaces deprecated Java applet) -->
+<script src="https://www.geogebra.org/apps/deployggb.js"></script>
+
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    margin: 0;
+    background: #f4f6f9;
+    color: #222;
+    line-height: 1.55;
+  }
+  header {
+    background: linear-gradient(90deg, #1a73e8, #34a853);
+    color: #fff;
+    padding: 22px 30px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  header h1 { margin: 0 0 4px 0; font-size: 1.55rem; }
+  header p  { margin: 0; opacity: 0.92; font-size: 0.95rem; }
+
+  nav {
+    background: #fff;
+    padding: 10px 30px;
+    border-bottom: 1px solid #e1e4e8;
+    position: sticky; top: 0; z-index: 1000;
+  }
+  nav a {
+    color: #1a73e8; text-decoration: none; margin-right: 18px;
+    font-weight: 600; font-size: 0.95rem;
+  }
+  nav a:hover { text-decoration: underline; }
+
+  main { padding: 24px 30px 60px 30px; max-width: 1300px; margin: 0 auto; }
+
+  section {
+    background: #fff;
+    border-radius: 10px;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  section h2 {
+    margin-top: 0;
+    color: #1a73e8;
+    border-bottom: 2px solid #e1e4e8;
+    padding-bottom: 8px;
+  }
+
+  .map-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) { .map-row { grid-template-columns: 1fr; } }
+
+  .map-box {
+    height: 420px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #ddd;
+  }
+  #googleMap iframe { width: 100%; height: 100%; border: 0; }
+  #networkMap { height: 100%; }
+
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-top: 14px;
+  }
+  .controls label { font-weight: 600; }
+  .controls select, .controls button {
+    padding: 8px 12px; border-radius: 6px; border: 1px solid #c5c9d0;
+    font-size: 0.95rem;
+  }
+  .controls button {
+    background: #1a73e8; color: #fff; border: none; cursor: pointer;
+    font-weight: 600;
+  }
+  .controls button:hover { background: #155cb8; }
+  .controls button.alt { background: #34a853; }
+  .controls button.alt:hover { background: #2a8e44; }
+
+  #pathResult {
+    margin-top: 12px; padding: 12px 14px; background: #eef5ff;
+    border-left: 4px solid #1a73e8; border-radius: 4px;
+    font-family: "Consolas", monospace; min-height: 22px;
+  }
+
+  #ggbApplet { display: flex; justify-content: center; }
+
+  .case {
+    border-left: 4px solid #34a853;
+    padding: 12px 16px;
+    margin: 14px 0;
+    background: #f6fbf7;
+    border-radius: 4px;
+  }
+  .case h3 { margin: 0 0 6px 0; color: #2a8e44; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { border: 1px solid #d8dde3; padding: 8px 10px; text-align: left; }
+  th { background: #f0f3f7; }
+
+  footer {
+    text-align: center; color: #777; padding: 20px;
+    font-size: 0.85rem; border-top: 1px solid #e1e4e8;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Web-Based Visualization of Road Networks using Google Map</h1>
+  <p>Case-study implementation integrating GeoGebra with HTML/JavaScript (replaces deprecated Java applets)</p>
+</header>
+
+<nav>
+  <a href="#intro">Introduction</a>
+  <a href="#maps">Map Visualization</a>
+  <a href="#algorithm">Shortest Path</a>
+  <a href="#geogebra">GeoGebra Applet</a>
+  <a href="#cases">Case Studies</a>
+</nav>
+
+<main>
+
+  <section id="intro">
+    <h2>1. Introduction</h2>
+    <p>
+      A <strong>road network</strong> can be modelled as a weighted graph
+      <em>G = (V, E, w)</em> where vertices <em>V</em> represent junctions or cities,
+      edges <em>E</em> represent road segments, and weights <em>w(e)</em> represent
+      distances or travel times. This web application visualizes such networks on
+      <strong>Google Maps</strong> alongside an interactive graph view, computes
+      shortest paths using <strong>Dijkstra's algorithm</strong>, and embeds a
+      <strong>GeoGebra applet</strong> for the mathematical representation.
+    </p>
+    <p>
+      Since Java applets are deprecated by modern browsers, the original
+      Java-applet workflow is reimplemented here with the
+      <strong>GeoGebra HTML5 API</strong> embedded directly via JavaScript.
+    </p>
+  </section>
+
+  <section id="maps">
+    <h2>2. Road Network on Google Map &amp; Interactive Graph</h2>
+    <div class="map-row">
+      <div>
+        <h3>Google Map (Geographic View)</h3>
+        <div class="map-box" id="googleMap">
+          <iframe
+            src="https://www.google.com/maps?q=New+Delhi,India&output=embed"
+            allowfullscreen loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+      <div>
+        <h3>Interactive Road-Network Graph</h3>
+        <div class="map-box"><div id="networkMap"></div></div>
+      </div>
+    </div>
+
+    <div class="controls" id="algorithm">
+      <label for="srcNode">Source:</label>
+      <select id="srcNode"></select>
+      <label for="dstNode">Destination:</label>
+      <select id="dstNode"></select>
+      <button onclick="runDijkstra()">Find Shortest Path</button>
+      <button class="alt" onclick="resetMap()">Reset</button>
+    </div>
+    <div id="pathResult">Select a source and destination, then click <em>Find Shortest Path</em>.</div>
+  </section>
+
+  <section id="geogebra">
+    <h2>3. Embedded GeoGebra Applet (Graph Representation)</h2>
+    <p>
+      The road network below is rendered inside a GeoGebra HTML5 applet —
+      the modern replacement for the legacy Java applet. Drag any vertex to
+      explore the graph interactively.
+    </p>
+    <div id="ggbApplet"></div>
+  </section>
+
+  <section id="cases">
+    <h2>4. Case Studies</h2>
+
+    <div class="case">
+      <h3>Case Study 1 — Shortest Route Between Cities</h3>
+      <p>
+        Given six cities A–F connected by roads of varying length (km), find
+        the shortest driving distance from <strong>A</strong> to <strong>F</strong>.
+        Dijkstra's algorithm running in this page produces the optimal path and
+        cost; the same network is plotted on Google Maps for geographic context.
+      </p>
+      <table>
+        <tr><th>Edge</th><th>Distance (km)</th><th>Edge</th><th>Distance (km)</th></tr>
+        <tr><td>A – B</td><td>7</td><td>C – E</td><td>10</td></tr>
+        <tr><td>A – C</td><td>9</td><td>D – F</td><td>11</td></tr>
+        <tr><td>B – D</td><td>15</td><td>E – F</td><td>6</td></tr>
+        <tr><td>B – C</td><td>10</td><td>C – D</td><td>11</td></tr>
+      </table>
+    </div>
+
+    <div class="case">
+      <h3>Case Study 2 — Traffic-Aware Routing</h3>
+      <p>
+        Replacing distance weights with average travel time turns the same graph
+        into a <em>time-weighted</em> network. Dijkstra now returns the fastest
+        route, demonstrating how the same algorithmic framework supports
+        congestion-aware navigation used by real Google Maps directions.
+      </p>
+    </div>
+
+    <div class="case">
+      <h3>Case Study 3 — Connectivity &amp; Critical Roads</h3>
+      <p>
+        Identifying <strong>bridges</strong> (edges whose removal disconnects
+        the graph) highlights critical road segments. For the network shown,
+        removing edge <em>D – F</em> isolates F from the rest of the network if
+        no alternative path of comparable cost exists, illustrating the
+        practical value of graph-theory analysis on road infrastructure.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Discrete Mathematics — Assignment 2 &middot; Built with HTML5, JavaScript,
+  Leaflet, Google Maps, and GeoGebra HTML5 API.
+</footer>
+
+<script>
+/* ---------- Road-network data: nodes (junctions) and edges (roads) ---------- */
+const nodes = {
+  A: { name: "A — Connaught Place",   lat: 28.6315, lng: 77.2167 },
+  B: { name: "B — India Gate",        lat: 28.6129, lng: 77.2295 },
+  C: { name: "C — Karol Bagh",        lat: 28.6519, lng: 77.1909 },
+  D: { name: "D — Lajpat Nagar",      lat: 28.5677, lng: 77.2436 },
+  E: { name: "E — Dwarka",            lat: 28.5921, lng: 77.0460 },
+  F: { name: "F — Noida Sector 18",   lat: 28.5708, lng: 77.3260 }
+};
+
+const edges = [
+  ["A","B", 7], ["A","C", 9], ["B","C",10],
+  ["B","D",15], ["C","D",11], ["C","E",10],
+  ["D","F",11], ["E","F", 6]
+];
+
+/* ---------- Leaflet interactive map ---------- */
+const map = L.map('networkMap').setView([28.61, 77.20], 11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18,
+  attribution: '&copy; OpenStreetMap'
+}).addTo(map);
+
+const markerLayer = L.layerGroup().addTo(map);
+const edgeLayer   = L.layerGroup().addTo(map);
+const pathLayer   = L.layerGroup().addTo(map);
+
+function drawGraph() {
+  edgeLayer.clearLayers();
+  markerLayer.clearLayers();
+
+  edges.forEach(([u, v, w]) => {
+    const line = L.polyline(
+      [[nodes[u].lat, nodes[u].lng], [nodes[v].lat, nodes[v].lng]],
+      { color: '#888', weight: 4, opacity: 0.7 }
+    ).bindTooltip(`${u} – ${v} : ${w} km`);
+    edgeLayer.addLayer(line);
+  });
+
+  Object.entries(nodes).forEach(([id, n]) => {
+    const m = L.circleMarker([n.lat, n.lng], {
+      radius: 10, color: '#1a73e8', fillColor: '#1a73e8', fillOpacity: 0.9
+    }).bindPopup(`<b>${id}</b><br>${n.name}`);
+    m.bindTooltip(id, { permanent: true, direction: 'top', offset: [0,-8] });
+    markerLayer.addLayer(m);
+  });
+}
+drawGraph();
+
+/* ---------- Populate dropdowns ---------- */
+const srcSel = document.getElementById('srcNode');
+const dstSel = document.getElementById('dstNode');
+Object.keys(nodes).forEach(id => {
+  srcSel.insertAdjacentHTML('beforeend', `<option value="${id}">${id}</option>`);
+  dstSel.insertAdjacentHTML('beforeend', `<option value="${id}">${id}</option>`);
+});
+srcSel.value = 'A';
+dstSel.value = 'F';
+
+/* ---------- Dijkstra's algorithm ---------- */
+function dijkstra(src, dst) {
+  const dist = {}, prev = {}, Q = new Set();
+  Object.keys(nodes).forEach(n => { dist[n] = Infinity; prev[n] = null; Q.add(n); });
+  dist[src] = 0;
+
+  const adj = {};
+  Object.keys(nodes).forEach(n => adj[n] = []);
+  edges.forEach(([u,v,w]) => { adj[u].push([v,w]); adj[v].push([u,w]); });
+
+  while (Q.size) {
+    let u = null;
+    Q.forEach(n => { if (u === null || dist[n] < dist[u]) u = n; });
+    if (u === dst || dist[u] === Infinity) break;
+    Q.delete(u);
+    adj[u].forEach(([v,w]) => {
+      if (!Q.has(v)) return;
+      const alt = dist[u] + w;
+      if (alt < dist[v]) { dist[v] = alt; prev[v] = u; }
+    });
+  }
+
+  const path = [];
+  let cur = dst;
+  while (cur) { path.unshift(cur); cur = prev[cur]; }
+  if (path[0] !== src) return null;
+  return { path, cost: dist[dst] };
+}
+
+function runDijkstra() {
+  const s = srcSel.value, d = dstSel.value;
+  pathLayer.clearLayers();
+  if (s === d) {
+    document.getElementById('pathResult').textContent =
+      'Source and destination are the same.';
+    return;
+  }
+  const res = dijkstra(s, d);
+  const out = document.getElementById('pathResult');
+  if (!res) { out.textContent = 'No path found.'; return; }
+
+  out.innerHTML =
+    `Shortest path: <b>${res.path.join(' → ')}</b><br>` +
+    `Total distance: <b>${res.cost} km</b>`;
+
+  const coords = res.path.map(id => [nodes[id].lat, nodes[id].lng]);
+  L.polyline(coords, { color: '#e8341a', weight: 6, opacity: 0.9 }).addTo(pathLayer);
+  map.fitBounds(L.latLngBounds(coords).pad(0.3));
+}
+
+function resetMap() {
+  pathLayer.clearLayers();
+  document.getElementById('pathResult').textContent =
+    'Select a source and destination, then click Find Shortest Path.';
+  map.setView([28.61, 77.20], 11);
+}
+
+/* ---------- GeoGebra HTML5 applet (replaces Java applet) ---------- */
+/* Builds the graph A–F with the same edges shown on the map. */
+const ggbCommands = [
+  'A = (0, 4)', 'B = (3, 5)', 'C = (1, 2)',
+  'D = (4, 1)', 'E = (-2, 0)', 'F = (5, 3)',
+  'eAB = Segment(A, B)', 'eAC = Segment(A, C)', 'eBC = Segment(B, C)',
+  'eBD = Segment(B, D)', 'eCD = Segment(C, D)', 'eCE = Segment(C, E)',
+  'eDF = Segment(D, F)', 'eEF = Segment(E, F)',
+  'SetCaption(A,"A")','SetCaption(B,"B")','SetCaption(C,"C")',
+  'SetCaption(D,"D")','SetCaption(E,"E")','SetCaption(F,"F")',
+  'ShowLabel(A,true)','ShowLabel(B,true)','ShowLabel(C,true)',
+  'ShowLabel(D,true)','ShowLabel(E,true)','ShowLabel(F,true)'
+];
+
+const ggbApp = new GGBApplet({
+  appName: 'graphing',
+  width: 800, height: 480,
+  showToolBar: true, showAlgebraInput: true, showMenuBar: false,
+  showResetIcon: true,
+  appletOnLoad: api => ggbCommands.forEach(c => api.evalCommand(c))
+}, true);
+
+window.addEventListener('load', () => ggbApp.inject('ggbApplet'));
+</script>
+
+</body>
+</html>
